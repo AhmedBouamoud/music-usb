@@ -236,7 +236,8 @@ function render(){
       ti.onchange = ()=>{ songs[i].latinTitle = sanitize(ti.value)||songs[i].latinTitle; ti.value=songs[i].latinTitle; };
       const orig = document.createElement('span'); orig.className='orig'; orig.textContent = songs[i].file.name;
       const del = document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='إزالة';
-      del.onclick = ()=>{ songs.splice(i,1); render(); };
+      const songRef = songs[i];
+      del.onclick = ()=>{ songs = songs.filter(s=>s!==songRef); render(); };
       row.append(ti, orig, del); div.appendChild(row);
     });
     box.appendChild(div);
@@ -253,21 +254,34 @@ $('buildBtn').onclick = async ()=>{
   const zip = new JSZip();
   const root = zip.folder('MUSIC');
   const g = groupsMap(); const num = $('optNum').checked;
-  const used = new Set();
+  const used = new Set(); const failed = [];
+  let done = 0, total = songs.length, added = 0;
   for(const [artist, idxs] of g){
     const folder = root.folder(artist);
-    idxs.forEach((i,k)=>{
+    for(let k=0; k<idxs.length; k++){
+      const i = idxs[k];
       let name = (num? String(k+1).padStart(2,'0')+' - ':'') + songs[i].latinTitle;
       let full = artist+'/'+name, n=2;
       while(used.has(full)){ full = artist+'/'+name+' ('+n+')'; n++; }
       used.add(full);
-      folder.file(full.split('/')[1]+'.mp3', songs[i].file);
-    });
+      try{
+        const buf = await songs[i].file.arrayBuffer(); // read now; fails only for THIS file
+        folder.file(full.split('/')[1]+'.mp3', buf);
+        added++;
+      }catch(e){ failed.push(songs[i].file.name); }
+      done++;
+      $('progBar').style.width = (done/total*50).toFixed(0)+'%';
+      if(done%5===0) await new Promise(r=>setTimeout(r));
+    }
+  }
+  if(!added){
+    alert('تعذرت قراءة كل الملفات. السبب الأرجح: الأغاني في Google Drive أو السحابة وليست محمّلة على الهاتف.\nنزّلها أولاً إلى الهاتف ثم اخترها من تطبيق "ملفاتي".');
+    $('buildBtn').disabled=false; $('prog').style.display='none'; $('lcdMsg').textContent='ERROR'; return;
   }
   try{
     const blob = await zip.generateAsync(
       {type:'blob', compression:'STORE'},
-      meta => { $('progBar').style.width = meta.percent.toFixed(0)+'%'; }
+      meta => { $('progBar').style.width = (50+meta.percent/2).toFixed(0)+'%'; }
     );
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -275,6 +289,9 @@ $('buildBtn').onclick = async ()=>{
     a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
     $('doneBox').style.display='block'; $('lcdMsg').textContent='DONE ✓';
+    if(failed.length){
+      $('doneBox').innerHTML += '<div style="margin-top:8px;color:#8a5a17">⚠️ تم تخطي <b>'+failed.length+'</b> ملفاً تعذرت قراءته (غالباً مخزّن في السحابة وليس على الهاتف):<br><span dir="ltr" style="font-size:.75rem">'+failed.slice(0,15).join('<br>')+(failed.length>15?'<br>...':'')+'</span><br>نزّله إلى الهاتف ثم أعد المحاولة به وحده.</div>';
+    }
   }catch(err){
     alert('تعذر إنشاء الملف: '+err.message+'\nجرّب عدداً أقل من الأغاني في كل دفعة.');
     $('lcdMsg').textContent='ERROR';
