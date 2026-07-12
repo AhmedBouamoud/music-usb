@@ -218,6 +218,66 @@ async function addArabicFile(page) {
     await ctx.close();
   }
 
+  // ============ Scénario 6 : copie directe (writeDirect, mêmes API que showDirectoryPicker) ============
+  {
+    console.log('— Scénario 6 : copie directe sans téléchargement —');
+    // OPFS exige un contexte sécurisé → petit serveur http://127.0.0.1
+    const http = require('http');
+    const appDir = path.dirname(APP);
+    const server = http.createServer((req, res) => {
+      const p = req.url === '/' ? '/index.html' : decodeURIComponent(req.url.split('?')[0]);
+      try {
+        res.setHeader('Content-Type', p.endsWith('.html') ? 'text/html; charset=utf-8' : 'application/octet-stream');
+        res.end(fs.readFileSync(path.join(appDir, p)));
+      } catch { res.statusCode = 404; res.end(); }
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    if (fs.existsSync(JSZIP)) await page.route('**cdnjs.cloudflare.com/**jszip**', r =>
+      r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(JSZIP, 'utf8') }));
+    await page.route('**fonts.googleapis.com/**', r => r.fulfill({ contentType: 'text/css', body: '' }));
+    await page.route('**fonts.gstatic.com/**', r => r.abort());
+    await page.goto('http://127.0.0.1:' + server.address().port + '/');
+    await page.waitForFunction(() => typeof JSZip !== 'undefined');
+    console.log('  (info) showDirectoryPicker dans ce navigateur de test:', await page.evaluate(() => 'showDirectoryPicker' in window));
+    await page.setInputFiles('#fileInput', [path.join(FIX, 'v23_cp1256.mp3'), path.join(FIX, 'v24_utf8.mp3'), path.join(FIX, 'Track99.mp3')]);
+    await page.waitForSelector('#reviewStep', { state: 'visible' });
+    await page.evaluate(() => { // + un fichier cloud illisible
+      const bad = new File([new Uint8Array(2000)], 'cloud_song.mp3', { type: 'audio/mpeg' });
+      const reject = () => Promise.reject(new DOMException('not found', 'NotFoundError'));
+      Object.defineProperty(bad, 'arrayBuffer', { value: reject });
+      Object.defineProperty(bad, 'stream', { value: () => new ReadableStream({ start(c) { c.error(new DOMException('not found', 'NotFoundError')); } }) });
+      const s = bad.slice.bind(bad);
+      Object.defineProperty(bad, 'slice', { value: (...a) => { const b = s(...a); Object.defineProperty(b, 'arrayBuffer', { value: reject }); return b; } });
+      return handleFiles([bad]);
+    });
+    const r = await page.evaluate(async () => {
+      const root = await navigator.storage.getDirectory(); // OPFS : mêmes handles que showDirectoryPicker
+      await root.removeEntry('MUSIC', { recursive: true }).catch(() => {});
+      const entries = buildPlan(songs.map((s, i) => ({ id: i, artist: s.latinArtist, title: s.latinTitle, size: s.file.size })), false, Infinity).flat();
+      const res = await writeDirect(root, entries, () => {});
+      const paths = [];
+      const music = await root.getDirectoryHandle('MUSIC');
+      for await (const [name, h] of music.entries()) {
+        if (h.kind !== 'directory') { paths.push('MUSIC/' + name); continue; }
+        for await (const [n2, h2] of h.entries()) {
+          const f = await h2.getFile();
+          paths.push('MUSIC/' + name + '/' + n2 + '|' + f.size);
+        }
+      }
+      return { added: res.added, failed: res.failed, paths: paths.sort() };
+    });
+    ok(r.added === 3, '3 fichiers lisibles copiés directement (' + r.added + ')');
+    ok(r.failed.length === 1 && r.failed[0] === 'cloud_song.mp3', 'fichier cloud sauté et signalé');
+    ok(r.paths.length === 3, 'aucun fichier fantôme à moitié écrit: ' + r.paths.join(', '));
+    ok(r.paths.every(p => /^MUSIC\/[\x20-\x7E]+\/[\x20-\x7E]+\.mp3\|[1-9]\d*$/.test(p)), 'structure MUSIC/Artiste/Titre.mp3, ASCII, taille > 0');
+    const sizes = r.paths.map(p => +p.split('|')[1]);
+    const expected = ['v23_cp1256.mp3', 'v24_utf8.mp3', 'Track99.mp3'].map(f => fs.statSync(path.join(FIX, f)).size).sort((a, b) => a - b);
+    ok(JSON.stringify(sizes.sort((a, b) => a - b)) === JSON.stringify(expected), 'contenus copiés intégralement (tailles identiques)');
+    await ctx.close(); server.close();
+  }
+
   await browser.close();
   console.log(`\ne2e: ${pass} OK, ${fail} ÉCHEC(S)`);
   process.exit(fail ? 1 : 0);

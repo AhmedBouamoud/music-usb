@@ -97,6 +97,8 @@ footer{text-align:center; font-size:.75rem; color:#8b93a0; margin-top:24px;}
     </div>
     <div id="warnBox" class="warn" style="display:none"></div>
     <div id="groups" style="margin-top:12px"></div>
+    <button class="main" id="directBtn" style="display:none;background:var(--blue)">⚡ نسخ مباشر إلى مفتاح USB أو مجلد — بدون تحميل ولا فك ضغط</button>
+    <p class="hint" id="directHint" style="display:none;margin-top:6px">اضغط الزر الأزرق ثم اختر مفتاح USB نفسه (أو أي مجلد) — سيُنشأ مجلد MUSIC منظماً بداخله مباشرة.</p>
     <button class="main" id="buildBtn">⬇ إنشاء الملف المضغوط للنسخ على USB</button>
     <div class="progress" id="prog"><i id="progBar"></i></div>
     <div class="done" id="doneBox">
@@ -367,6 +369,74 @@ async function packChunk(entries, useBuffers, failed, onFile, onGen){
   if(!added) return null;
   return zip.generateAsync({type:'blob', compression:'STORE'}, onGen);
 }
+
+/* ================= Copie directe (File System Access API) ================= */
+// écrit MUSIC/Artiste/Titre.mp3 directement dans un dossier choisi — aucun téléchargement
+async function writeDirect(rootDir, entries, onFile){
+  const failed = []; let added = 0;
+  const music = await rootDir.getDirectoryHandle('MUSIC', {create:true});
+  const folders = new Map();
+  for(const e of entries){
+    try{
+      let fold = folders.get(e.folder);
+      if(!fold){ fold = await music.getDirectoryHandle(e.folder, {create:true}); folders.set(e.folder, fold); }
+      const file = songs[e.id].file;
+      await probeFile(file);
+      const fh = await fold.getFileHandle(e.name, {create:true});
+      const w = await fh.createWritable();
+      try{ await file.stream().pipeTo(w); }
+      catch(err){
+        try{ await w.abort(); }catch(_){}
+        try{ await fold.removeEntry(e.name); }catch(_){} // ne pas laisser un fichier à moitié écrit
+        throw err;
+      }
+      added++;
+    }catch(err){ failed.push(songs[e.id].file.name); }
+    onFile(); await sleep(0);
+  }
+  return {added, failed};
+}
+
+if('showDirectoryPicker' in window){
+  $('directBtn').style.display='block';
+  $('directHint').style.display='block';
+}
+$('directBtn').onclick = async ()=>{
+  if(!songs.length) return;
+  let root;
+  try{ root = await showDirectoryPicker({mode:'readwrite'}); }
+  catch(err){
+    if(err && err.name==='AbortError') return; // l'utilisateur a annulé
+    alert('لم يسمح المتصفح بالوصول إلى المجلد.\nما العمل؟ أعد المحاولة واضغط "السماح/Autoriser" عند السؤال، أو استعمل زر الملف المضغوط بالأسفل.');
+    return;
+  }
+  $('directBtn').disabled = $('buildBtn').disabled = true;
+  $('doneBox').style.display='none'; $('prog').style.display='block'; $('progBar').style.width='0%';
+  $('lcdMsg').textContent='COPYING ♪';
+  const entries = buildPlan(songs.map((s,i)=>({id:i, artist:s.latinArtist, title:s.latinTitle, size:s.file.size})),
+                            $('optNum').checked, Infinity).flat();
+  let processed = 0;
+  try{
+    const {added, failed} = await writeDirect(root, entries,
+      ()=>{ processed++; $('progBar').style.width = (processed/entries.length*100).toFixed(0)+'%'; });
+    if(!added){
+      alert('تعذرت قراءة كل الملفات المختارة.\nالسبب الأرجح: الأغاني موجودة في السحابة (Google Drive) وليست محمّلة على الجهاز.\nما العمل؟ نزّلها على الجهاز أولاً ثم اخترها من جديد.');
+      $('lcdMsg').textContent='ERROR';
+    }else{
+      $('doneBox').style.display='block'; $('lcdMsg').textContent='DONE ✓';
+      $('doneBox').innerHTML = '✅ <b>تم النسخ مباشرة! ('+added+' أغنية)</b><br>'
+        + 'أُنشئ مجلد <b dir="ltr">MUSIC</b> منظماً داخل المكان الذي اخترته.<br>'
+        + '• إن اخترت مفتاح USB نفسه — فهو جاهز للسيارة الآن 🚗🎵<br>'
+        + '• إن اخترت مجلداً على الجهاز — انسخ مجلد MUSIC منه إلى مفتاح USB (بنظام <b dir="ltr">FAT32</b>، سعة 32GB أو أقل).'
+        + (failed.length? '<div style="margin-top:8px;color:#8a5a17">⚠️ تم تخطي <b>'+failed.length+'</b> ملفاً تعذرت قراءته — غالباً لأنه في السحابة وغير محمّل على الجهاز:<br><span dir="ltr" style="font-size:.75rem">'+failed.slice(0,15).join('<br>')+(failed.length>15?'<br>...':'')+'</span></div>' : '');
+    }
+  }catch(err){
+    alert('تعذر النسخ المباشر ('+err.message+').\nما العمل؟ جرّب زر "إنشاء الملف المضغوط" بالأسفل — يعمل في كل الحالات.');
+    $('lcdMsg').textContent='ERROR';
+  }
+  $('directBtn').disabled = $('buildBtn').disabled = false;
+  $('prog').style.display='none'; $('progBar').style.width='0%';
+};
 
 $('buildBtn').onclick = async ()=>{
   if(!songs.length) return;
