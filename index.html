@@ -27,30 +27,33 @@ body{font-family:'Cairo',sans-serif; background:var(--paper); color:var(--ink); 
 .step h2{font-size:1rem; font-weight:800; color:var(--blue); margin-bottom:8px;}
 .hint{font-size:.85rem; color:#5c6672; line-height:1.7;}
 
-.drop{border:2px dashed var(--blue); border-radius:12px; padding:26px 14px; text-align:center; cursor:pointer; transition:.15s; background:#f2f7fb;}
+.drop{border:2px dashed var(--blue); border-radius:12px; padding:30px 14px; text-align:center; cursor:pointer; transition:.15s; background:#f2f7fb;}
 .drop.on{background:#e3f0f9; border-color:var(--orange);}
-.drop p{font-weight:700; color:var(--blue);}
+.drop p{font-weight:700; color:var(--blue); font-size:1.05rem;}
 .drop small{color:#5c6672;}
 
-button.main{background:var(--orange); color:#fff; border:0; font-family:inherit; font-weight:800; font-size:1rem; padding:12px 22px; border-radius:10px; cursor:pointer; width:100%; margin-top:10px;}
+button.main{background:var(--orange); color:#fff; border:0; font-family:inherit; font-weight:800; font-size:1.05rem; padding:15px 22px; border-radius:10px; cursor:pointer; width:100%; margin-top:10px;}
 button.main:disabled{background:#c9c2b6; cursor:not-allowed;}
-button.ghost{background:#fff; color:var(--blue); border:1.5px solid var(--blue); font-family:inherit; font-weight:700; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:.85rem;}
+button.ghost{background:#fff; color:var(--blue); border:1.5px solid var(--blue); font-family:inherit; font-weight:700; padding:8px 16px; border-radius:8px; cursor:pointer; font-size:.85rem; min-height:40px;}
+button.ghost.danger{color:#c0392b; border-color:#c0392b;}
 
-.opts{display:flex; flex-direction:column; gap:8px; margin-top:8px; font-size:.9rem;}
-.opts label{display:flex; align-items:center; gap:8px; cursor:pointer;}
-.opts input{width:18px;height:18px; accent-color:var(--orange);}
+.opts{display:flex; flex-direction:column; gap:10px; margin-top:10px; font-size:.9rem;}
+.opts label{display:flex; align-items:center; gap:10px; cursor:pointer; min-height:32px;}
+.opts input{width:20px;height:20px; accent-color:var(--orange); flex:none;}
 
 /* ---- Groups ---- */
 .group{border:1px solid var(--line); border-radius:10px; margin-bottom:12px; overflow:hidden;}
 .group header{background:#eef4f9; padding:8px 12px; display:flex; align-items:center; gap:8px;}
 .group header .tag{background:var(--blue); color:#fff; font-size:.7rem; font-weight:800; border-radius:6px; padding:2px 8px; flex:none;}
-.group header input{flex:1; border:1px solid #c7d6e2; border-radius:6px; padding:4px 8px; font-family:'Courier New',monospace; font-weight:700; font-size:.9rem; direction:ltr; text-align:left; min-width:0;}
+.group header input{flex:1; border:1px solid #c7d6e2; border-radius:6px; padding:7px 8px; font-family:'Courier New',monospace; font-weight:700; font-size:.95rem; direction:ltr; text-align:left; min-width:0;}
 .song{display:flex; align-items:center; gap:8px; padding:6px 12px; border-top:1px solid #f0ece3; font-size:.85rem;}
-.song input{flex:1; border:1px solid #e0dacd; border-radius:6px; padding:3px 8px; font-family:'Courier New',monospace; font-size:.82rem; direction:ltr; text-align:left; min-width:0;}
+.song input{flex:1; border:1px solid #e0dacd; border-radius:6px; padding:6px 8px; font-family:'Courier New',monospace; font-size:.9rem; direction:ltr; text-align:left; min-width:0;}
+.song.dup input{border-color:#e8a13c; background:#fdf6ea;}
 .song .orig{color:#8b93a0; font-size:.72rem; max-width:34%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:ltr;}
-.song .del{border:0;background:none;color:#c0392b;cursor:pointer;font-size:1rem;flex:none;}
+.song .del{border:0;background:none;color:#c0392b;cursor:pointer;font-size:1.15rem;flex:none;min-width:40px;min-height:40px;}
 
 .warn{background:#fdf3e7; border:1px solid #f0cfa3; border-radius:10px; padding:10px 14px; font-size:.85rem; color:#8a5a17; margin-bottom:12px; line-height:1.8;}
+.toolbar{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;}
 .progress{height:14px; background:#e8e2d5; border-radius:7px; overflow:hidden; margin-top:12px; display:none;}
 .progress i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--blue),var(--orange)); transition:width .2s;}
 .done{display:none; background:#eaf7ee; border:1px solid #b8e0c4; border-radius:10px; padding:14px; margin-top:12px; font-size:.9rem; line-height:1.9;}
@@ -76,18 +79,22 @@ footer{text-align:center; font-size:.75rem; color:#8b93a0; margin-top:24px;}
     <h2>١ · اختر الأغاني</h2>
     <label class="drop" id="drop" for="fileInput" style="display:block;position:relative">
       <p>اضغط هنا لاختيار ملفات MP3</p>
-      <small>أو اسحبها وأفلتها هنا (يمكن اختيار مئات الملفات دفعة واحدة)</small>
+      <small>أو اسحبها وأفلتها هنا · يمكنك الاختيار على دفعات من مجلدات مختلفة، وستُضاف كلها إلى القائمة</small>
       <input type="file" id="fileInput" multiple accept=".mp3,audio/mpeg,audio/*" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
     </label>
     <div class="opts">
       <label><input type="checkbox" id="optNum"> ترقيم الأغاني داخل كل مجلد (01, 02, ...)</label>
-      <label><input type="checkbox" id="optSplit" checked> ملف مضغوط منفصل لكل فنان (أنسب للهاتف — ملفات صغيرة)</label>
+      <label><input type="checkbox" id="optSplit" checked> تقسيم التحميل إلى ملفات صغيرة (أنسب للهاتف — يتفادى فشل تنزيل الملفات الضخمة)</label>
     </div>
   </div>
 
   <div class="step" id="reviewStep" style="display:none">
     <h2>٢ · راجع المجلدات</h2>
     <p class="hint">حُوِّلت الأسماء إلى حروف لاتينية ليقرأها راديو السيارة. يمكنك تعديل اسم أي مجلد أو ملف. لدمج فنانَين، أعطِ المجلدين نفس الاسم.</p>
+    <div class="toolbar">
+      <button class="ghost danger" id="clearBtn">🗑 مسح الكل والبدء من جديد</button>
+      <button class="ghost" id="dedupBtn" style="display:none">✨ حذف المكررات تلقائياً</button>
+    </div>
     <div id="warnBox" class="warn" style="display:none"></div>
     <div id="groups" style="margin-top:12px"></div>
     <button class="main" id="buildBtn">⬇ إنشاء الملف المضغوط للنسخ على USB</button>
@@ -145,7 +152,7 @@ async function readTags(file){
       const end = Math.min(10+tagSize, head.length);
       const idLen = (ver===2)?3:4, szLen=(ver===2)?3:4, flLen=(ver===2)?0:2;
       const wantA = (ver===2)?'TP1':'TPE1', wantT = (ver===2)?'TT2':'TIT2';
-      while(pos + idLen + szLen <= end){
+      while(pos + idLen + szLen + flLen <= end){
         const id = String.fromCharCode(...head.subarray(pos, pos+idLen));
         if(!/^[A-Z0-9]+$/.test(id)) break;
         let size;
@@ -153,11 +160,12 @@ async function readTags(file){
         else if(ver===4) size = ss(head[pos+4],head[pos+5],head[pos+6],head[pos+7]);
         else size = (head[pos+4]<<24)|(head[pos+5]<<16)|(head[pos+6]<<8)|head[pos+7];
         const dataStart = pos + idLen + szLen + flLen;
-        if(size<=0 || dataStart+size>head.length) break;
+        if(size<0 || dataStart+size>head.length) break;
         if(id===wantA) out.artist = readText(head.subarray(dataStart, dataStart+size));
         if(id===wantT) out.title  = readText(head.subarray(dataStart, dataStart+size));
         if(out.artist && out.title) break;
         pos = dataStart + size;
+        if(size===0) break; // frame vide en fin de tag → éviter boucle infinie
       }
     }
     if(!out.artist || !out.title){ // ID3v1 fallback (often windows-1256 in Morocco)
@@ -177,38 +185,106 @@ async function readTags(file){
   return out;
 }
 
+/* ================= Plan de nommage + découpage (fonctions pures, testables) ================= */
+// nom de base unique dans un dossier, ≤56 caractères (+ ".mp3" = 60, limite autoradio)
+function uniqueName(base, used){
+  const clamp = (s,max)=> s.length>max ? s.slice(0,max).trim() : s;
+  let name = clamp(base,56), n = 2;
+  while(used.has(name.toLowerCase())){ // FAT32 insensible à la casse
+    const suf = ' ('+n+')';
+    name = clamp(base, 56-suf.length) + suf;
+    n++;
+  }
+  used.add(name.toLowerCase());
+  return name;
+}
+// items: [{id, artist, title, size}] → liste de lots [[{id, folder, name, size}], ...]
+// chaque lot ≤ maxBytes (un fichier énorme reste seul dans son lot)
+function buildPlan(items, numbered, maxBytes){
+  const byArtist = new Map();
+  for(const it of items){
+    const k = it.artist || 'Artiste Inconnu';
+    if(!byArtist.has(k)) byArtist.set(k, []);
+    byArtist.get(k).push(it);
+  }
+  const entries = [];
+  for(const artist of [...byArtist.keys()].sort((a,b)=>a.localeCompare(b))){
+    const used = new Set();
+    byArtist.get(artist).forEach((it,k)=>{
+      const prefix = numbered ? String(k+1).padStart(2,'0')+' - ' : '';
+      entries.push({id:it.id, folder:artist, name:uniqueName(prefix+it.title, used)+'.mp3', size:it.size});
+    });
+  }
+  if(!entries.length) return [];
+  const chunks = [[]]; let cur = 0;
+  for(const e of entries){
+    if(cur>0 && cur+e.size>maxBytes){ chunks.push([]); cur = 0; }
+    chunks[chunks.length-1].push(e); cur += e.size;
+  }
+  return chunks;
+}
+// détection de doublons (même artiste+titre) → indices à supprimer (on garde le plus gros fichier)
+function findDuplicates(items){
+  const best = new Map(), drop = [];
+  for(const it of items){
+    const k = (it.artist+'|'+it.title).toLowerCase();
+    const prev = best.get(k);
+    if(prev===undefined) best.set(k, it);
+    else if(it.size>prev.size){ drop.push(prev.id); best.set(k, it); }
+    else drop.push(it.id);
+  }
+  return drop;
+}
+
 /* ================= App state ================= */
-let songs = []; // {file, artist, title, latinArtist, latinTitle, keep}
+let songs = []; // {file, latinArtist, latinTitle}
+const edits = new Map(); // "nom|taille" → {la, lt} : réutilisé si le fichier est resélectionné
 const $ = id => document.getElementById(id);
-const fmtSize = n => n>1e9 ? (n/1e9).toFixed(2)+' GB' : (n/1e6).toFixed(0)+' MB';
+const fmtSize = n => n>1e9 ? (n/1e9).toFixed(2)+' GB' : n>1e6 ? (n/1e6).toFixed(0)+' MB' : Math.max(1,Math.round(n/1e3))+' KB';
+const editKey = f => f.name+'|'+f.size;
+var MAX_ZIP_BYTES = 300*1e6; // au-delà, Chrome/Android échoue souvent à télécharger le blob
 
 ['dragover','dragleave','drop'].forEach(ev=> $('drop').addEventListener(ev, e=>{
   e.preventDefault();
   $('drop').classList.toggle('on', ev==='dragover');
   if(ev==='drop') handleFiles(e.dataTransfer.files);
 }));
-$('fileInput').onchange = e => handleFiles(e.target.files);
+$('fileInput').onchange = e => { handleFiles(e.target.files); e.target.value=''; };
 
 async function handleFiles(list){
   const files = [...list];
   const mp3s = files.filter(f=>/\.mp3$/i.test(f.name));
   const skipped = files.length - mp3s.length;
-  if(!mp3s.length){ alert('لم أجد ملفات MP3. راديو السيارة القديم يقرأ MP3 فقط.'); return; }
-  $('lcdMsg').textContent='READING TAGS...';
-  songs = [];
-  for(let i=0;i<mp3s.length;i++){
-    const f = mp3s[i];
+  if(!mp3s.length){ alert('لم أجد ملفات MP3 في اختيارك.\nراديو السيارة القديم يقرأ MP3 فقط — حوّل الأغاني إلى MP3 ثم أعد المحاولة.'); return; }
+  const known = new Set(songs.map(s=>editKey(s.file)));
+  const fresh = mp3s.filter(f=>!known.has(editKey(f))); // resélection du même fichier = ignorée
+  $('lcdMsg').textContent='READING 0/'+fresh.length;
+  for(let i=0;i<fresh.length;i++){
+    const f = fresh[i];
     const t = await readTags(f);
-    const la = sanitize(t.artist) || 'Artiste Inconnu';
-    const lt = sanitize(t.title) || sanitize(f.name.replace(/\.mp3$/i,'')) || ('Piste '+(i+1));
+    let la = sanitize(t.artist) || 'Artiste Inconnu';
+    let lt = sanitize(t.title) || sanitize(f.name.replace(/\.mp3$/i,'')) || ('Piste '+(songs.length+1));
+    const saved = edits.get(editKey(f)); // reprendre les corrections faites avant
+    if(saved){ la = saved.la || la; lt = saved.lt || lt; }
     songs.push({file:f, latinArtist:la, latinTitle:lt});
-    if(i%20===0){ $('lcdF').textContent = i+'/'+mp3s.length; await new Promise(r=>setTimeout(r)); }
+    $('lcdMsg').textContent='READING '+(i+1)+'/'+fresh.length;
+    if(i%10===0) await new Promise(r=>setTimeout(r));
   }
   const wb = $('warnBox');
   if(skipped>0){ wb.style.display='block'; wb.innerHTML = '⚠️ تم استبعاد <b>'+skipped+'</b> ملفاً بصيغة غير MP3 (الراديو القديم لا يقرأها). حوّلها إلى MP3 ثم أضفها.'; }
   else wb.style.display='none';
   render();
 }
+
+$('clearBtn').onclick = ()=>{
+  if(songs.length && !confirm('سيتم إفراغ القائمة كلها (ملفاتك على الجهاز لا تُمسّ). متابعة؟')) return;
+  songs = []; render();
+};
+$('dedupBtn').onclick = ()=>{
+  const drop = new Set(findDuplicates(songs.map((s,i)=>({id:i, artist:s.latinArtist, title:s.latinTitle, size:s.file.size}))));
+  songs = songs.filter((s,i)=>!drop.has(i));
+  render();
+};
 
 function groupsMap(){
   const g = new Map();
@@ -218,23 +294,34 @@ function groupsMap(){
 
 function render(){
   const g = groupsMap();
-  $('lcdF').textContent = songs.length;
-  $('lcdA').textContent = g.size;
-  $('lcdS').textContent = fmtSize(songs.reduce((a,s)=>a+s.file.size,0));
+  $('lcdF').textContent = songs.length || '--';
+  $('lcdA').textContent = g.size || '--';
+  $('lcdS').textContent = songs.length? fmtSize(songs.reduce((a,s)=>a+s.file.size,0)) : '--';
   $('lcdMsg').textContent = songs.length? 'READY ▶':'INSERT MUSIC ♪';
   $('reviewStep').style.display = songs.length? 'block':'none';
+  const dups = new Set(findDuplicates(songs.map((s,i)=>({id:i, artist:s.latinArtist, title:s.latinTitle, size:s.file.size}))));
+  $('dedupBtn').style.display = dups.size? 'inline-block':'none';
+  if(dups.size) $('dedupBtn').textContent = '✨ حذف المكررات تلقائياً ('+dups.size+')';
   const box = $('groups'); box.innerHTML='';
   for(const [artist, idxs] of g){
     const div = document.createElement('div'); div.className='group';
     const h = document.createElement('header');
     h.innerHTML = '<span class="tag">📁 '+idxs.length+'</span>';
     const inp = document.createElement('input'); inp.value = artist;
-    inp.onchange = ()=>{ const v=sanitize(inp.value)||'Artiste Inconnu'; idxs.forEach(i=>songs[i].latinArtist=v); render(); };
+    inp.onchange = ()=>{
+      const v=sanitize(inp.value)||'Artiste Inconnu';
+      idxs.forEach(i=>{ songs[i].latinArtist=v; edits.set(editKey(songs[i].file), {la:v, lt:songs[i].latinTitle}); });
+      render();
+    };
     h.appendChild(inp); div.appendChild(h);
     idxs.forEach(i=>{
-      const row = document.createElement('div'); row.className='song';
+      const row = document.createElement('div'); row.className='song'+(dups.has(i)?' dup':'');
       const ti = document.createElement('input'); ti.value = songs[i].latinTitle;
-      ti.onchange = ()=>{ songs[i].latinTitle = sanitize(ti.value)||songs[i].latinTitle; ti.value=songs[i].latinTitle; };
+      ti.onchange = ()=>{
+        songs[i].latinTitle = sanitize(ti.value)||songs[i].latinTitle; ti.value=songs[i].latinTitle;
+        edits.set(editKey(songs[i].file), {la:songs[i].latinArtist, lt:songs[i].latinTitle});
+        render();
+      };
       const orig = document.createElement('span'); orig.className='orig'; orig.textContent = songs[i].file.name;
       const del = document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='إزالة';
       const songRef = songs[i];
@@ -246,78 +333,86 @@ function render(){
 }
 
 /* ================= Build ZIP ================= */
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function saveBlob(blob, name){
+  const a = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 300000); // libérer après 5 min (jamais tôt : Android télécharge lentement)
+}
+
+// vérifie qu'un fichier est réellement lisible (les fichiers "cloud" non téléchargés échouent ici)
+async function probeFile(file){
+  await file.slice(0, 4096).arrayBuffer();
+  if(file.size>4096) await file.slice(file.size-1).arrayBuffer();
+}
+
+// construit un ZIP pour un lot ; useBuffers=true relit tout en mémoire fichier par fichier (secours)
+async function packChunk(entries, useBuffers, failed, onFile, onGen){
+  const zip = new JSZip(); const root = zip.folder('MUSIC');
+  let added = 0;
+  for(const e of entries){
+    try{
+      if(useBuffers){
+        root.folder(e.folder).file(e.name, await songs[e.id].file.arrayBuffer());
+      }else{
+        await probeFile(songs[e.id].file);
+        root.folder(e.folder).file(e.name, songs[e.id].file); // JSZip lit le File en flux → mémoire réduite
+      }
+      added++;
+    }catch(err){ failed.push(songs[e.id].file.name); }
+    onFile(); await sleep(0);
+  }
+  if(!added) return null;
+  return zip.generateAsync({type:'blob', compression:'STORE'}, onGen);
+}
+
 $('buildBtn').onclick = async ()=>{
   if(!songs.length) return;
-  const split = $('optSplit').checked;
-  const totalGB = songs.reduce((a,s)=>a+s.file.size,0)/1e9;
-  if(!split && totalGB>1 && !confirm('الحجم كبير وقد يفشل التنزيل على الهاتف. يُنصح بتفعيل خيار "ملف لكل فنان". المتابعة بملف واحد؟')) return;
+  const split = $('optSplit').checked, num = $('optNum').checked;
+  const totalBytes = songs.reduce((a,s)=>a+s.file.size,0);
+  if(!split && totalBytes>1e9 && !confirm('الحجم كبير ('+fmtSize(totalBytes)+') وقد يفشل التنزيل على الهاتف.\nيُنصح بتفعيل خيار "تقسيم التحميل إلى ملفات صغيرة". المتابعة بملف واحد رغم ذلك؟')) return;
   $('buildBtn').disabled = true; $('doneBox').style.display='none';
-  $('prog').style.display='block'; $('lcdMsg').textContent='BURNING... ♪';
-  const g = groupsMap(); const num = $('optNum').checked;
-  const failed = []; let addedTotal = 0;
-
-  const saveBlob = (blob, name)=>{
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-  };
-  async function packGroup(zipRoot, artist, idxs){
-    const folder = zipRoot.folder(artist);
-    const used = new Set(); let added = 0;
-    for(let k=0; k<idxs.length; k++){
-      const i = idxs[k];
-      let name = (num? String(k+1).padStart(2,'0')+' - ':'') + songs[i].latinTitle;
-      let n = 2; while(used.has(name)){ name = songs[i].latinTitle+' ('+n+')'; n++; }
-      used.add(name);
-      try{
-        const buf = await songs[i].file.arrayBuffer();
-        folder.file(name+'.mp3', buf); added++;
-      }catch(e){ failed.push(songs[i].file.name); }
-      await new Promise(r=>setTimeout(r));
-    }
-    return added;
-  }
+  $('prog').style.display='block'; $('progBar').style.width='0%';
+  const chunks = buildPlan(songs.map((s,i)=>({id:i, artist:s.latinArtist, title:s.latinTitle, size:s.file.size})),
+                           num, split? MAX_ZIP_BYTES : Infinity);
+  const totalFiles = songs.length, failed = [];
+  let processed = 0, addedTotal = 0, downloaded = 0;
 
   try{
-    if(split){
-      const arts = [...g.entries()]; let gi = 0;
-      for(const [artist, idxs] of arts){
-        const zip = new JSZip();
-        const added = await packGroup(zip.folder('MUSIC'), artist, idxs);
-        if(added){
-          const blob = await zip.generateAsync({type:'blob', compression:'STORE'});
-          saveBlob(blob, 'MUSIC_'+artist.replace(/\s+/g,'_')+'.zip');
-          addedTotal += added;
-          await new Promise(r=>setTimeout(r, 1800)); // laisser le téléchargement démarrer
-        }
-        gi++; $('progBar').style.width = (gi/arts.length*100).toFixed(0)+'%';
+    for(let c=0;c<chunks.length;c++){
+      $('lcdMsg').textContent = 'BURNING '+(c+1)+'/'+chunks.length+' ♪';
+      const before = failed.length;
+      const onFile = ()=>{ processed++; $('progBar').style.width = (processed/totalFiles*90).toFixed(0)+'%'; };
+      const onGen  = m => { $('progBar').style.width = ((processed/totalFiles)*90 + m.percent/chunks.length*.1).toFixed(0)+'%'; };
+      let blob;
+      try{
+        blob = await packChunk(chunks[c], false, failed, onFile, onGen);
+      }catch(err){ // un fichier a lâché pendant la compression → refaire ce lot en lisant fichier par fichier
+        failed.length = before; processed -= chunks[c].length;
+        blob = await packChunk(chunks[c], true, failed, onFile, onGen);
       }
-    } else {
-      const zip = new JSZip(); const root = zip.folder('MUSIC');
-      let gi = 0;
-      for(const [artist, idxs] of g){
-        addedTotal += await packGroup(root, artist, idxs);
-        gi++; $('progBar').style.width = (gi/g.size*50).toFixed(0)+'%';
-      }
-      if(addedTotal){
-        const blob = await zip.generateAsync(
-          {type:'blob', compression:'STORE'},
-          meta => { $('progBar').style.width = (50+meta.percent/2).toFixed(0)+'%'; }
-        );
-        saveBlob(blob, 'MUSIC_USB.zip');
+      const okCount = chunks[c].length - (failed.length - before);
+      if(blob && okCount>0){
+        addedTotal += okCount; downloaded++;
+        saveBlob(blob, chunks.length===1 ? 'MUSIC_USB.zip' : 'MUSIC_'+(c+1)+'_sur_'+chunks.length+'.zip');
+        if(c<chunks.length-1) await sleep(1800); // laisser le téléchargement démarrer avant le suivant
       }
     }
     if(!addedTotal){
-      alert('تعذرت قراءة كل الملفات. السبب الأرجح: الأغاني في السحابة وليست محمّلة على الهاتف.\nنزّلها أولاً ثم اخترها من تطبيق "ملفاتي".');
+      alert('تعذرت قراءة كل الملفات المختارة.\nالسبب الأرجح: الأغاني موجودة في السحابة (Google Drive) وليست محمّلة على الهاتف.\nما العمل؟ افتح تطبيق "ملفاتي"، نزّل الأغاني على الجهاز، ثم اخترها من جديد.');
       $('lcdMsg').textContent='ERROR';
     } else {
       $('doneBox').style.display='block'; $('lcdMsg').textContent='DONE ✓';
-      $('doneBox').innerHTML = '✅ <b>تم! ('+addedTotal+' أغنية)</b> الخطوات المتبقية:<br>١) فك ضغط '+(split?'كل الملفات في نفس المكان — ستتجمع داخل مجلد <b dir="ltr">MUSIC</b>':'الملف — ستجد مجلد <b dir="ltr">MUSIC</b>')+'<br>٢) هيّئ مفتاح USB بنظام <b dir="ltr">FAT32</b> (32GB أو أقل)<br>٣) انسخ مجلد MUSIC كاملاً إلى المفتاح — وبالسلامة 🚗🎵'
-        + (failed.length? '<div style="margin-top:8px;color:#8a5a17">⚠️ تم تخطي <b>'+failed.length+'</b> ملفاً تعذرت قراءته (غالباً في السحابة):<br><span dir="ltr" style="font-size:.75rem">'+failed.slice(0,15).join('<br>')+(failed.length>15?'<br>...':'')+'</span></div>' : '');
+      $('doneBox').innerHTML = '✅ <b>تم! ('+addedTotal+' أغنية'+(downloaded>1? ' في '+downloaded+' ملفات مضغوطة':'')+')</b> الخطوات المتبقية:<br>'
+        + '١) فك ضغط '+(downloaded>1?'<b>كل الملفات في نفس المكان</b> — ستتجمع تلقائياً داخل مجلد واحد <b dir="ltr">MUSIC</b>':'الملف — ستجد مجلد <b dir="ltr">MUSIC</b>')+'<br>'
+        + '٢) هيّئ مفتاح USB بنظام <b dir="ltr">FAT32</b> (سعة 32GB أو أقل)<br>'
+        + '٣) انسخ مجلد MUSIC كاملاً إلى المفتاح — وبالسلامة 🚗🎵'
+        + (failed.length? '<div style="margin-top:8px;color:#8a5a17">⚠️ تم تخطي <b>'+failed.length+'</b> ملفاً تعذرت قراءته — غالباً لأنه في السحابة وغير محمّل على الجهاز. نزّله من تطبيق "ملفاتي" ثم أضفه وحده:<br><span dir="ltr" style="font-size:.75rem">'+failed.slice(0,15).join('<br>')+(failed.length>15?'<br>...':'')+'</span></div>' : '');
     }
   }catch(err){
-    alert('تعذر إنشاء الملف: '+err.message+'\nفعّل خيار "ملف لكل فنان" أو اعمل على دفعات أصغر.');
+    alert('تعذر إنشاء الملف المضغوط ('+err.message+').\nما العمل؟ تأكد أن خيار "تقسيم التحميل إلى ملفات صغيرة" مفعّل، أو جرّب على دفعات أصغر (فنان أو اثنان في كل مرة).');
     $('lcdMsg').textContent='ERROR';
   }
   $('buildBtn').disabled=false; $('prog').style.display='none'; $('progBar').style.width='0%';
