@@ -278,6 +278,90 @@ async function addArabicFile(page) {
     await ctx.close(); server.close();
   }
 
+  // ============ Scénario 7 : organisation d'une clé USB sur place (scan + move) ============
+  {
+    console.log('— Scénario 7 : organiser la clé USB sur place —');
+    const http = require('http');
+    const appDir = path.dirname(APP);
+    const server = http.createServer((req, res) => {
+      const p = req.url === '/' ? '/index.html' : decodeURIComponent(req.url.split('?')[0]);
+      try {
+        res.setHeader('Content-Type', p.endsWith('.html') ? 'text/html; charset=utf-8' : 'application/octet-stream');
+        res.end(fs.readFileSync(path.join(appDir, p)));
+      } catch { res.statusCode = 404; res.end(); }
+    });
+    await new Promise(r => server.listen(0, '127.0.0.1', r));
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    if (fs.existsSync(JSZIP)) await page.route('**cdnjs.cloudflare.com/**jszip**', r =>
+      r.fulfill({ contentType: 'application/javascript', body: fs.readFileSync(JSZIP, 'utf8') }));
+    await page.route('**fonts.googleapis.com/**', r => r.fulfill({ contentType: 'text/css', body: '' }));
+    await page.route('**fonts.gstatic.com/**', r => r.abort());
+    await page.goto('http://127.0.0.1:' + server.address().port + '/');
+    await page.waitForFunction(() => typeof JSZip !== 'undefined');
+
+    // fausse clé USB dans l'OPFS :
+    //  - un fichier déjà bien rangé (doit être laissé en place)
+    //  - un « chaises musicales » : un fichier occupe l'emplacement cible d'un autre
+    //  - un fichier sans tags à la racine
+    const bytes = f => [...fs.readFileSync(path.join(FIX, f))];
+    const tree = [
+      ['MUSIC/Alhaja Alhmdaouia/Hzi Kask.mp3', bytes('v23_utf16.mp3')],  // tags: Said Alsnhaji → doit partir
+      ['random/Chansons/hzi.mp3',              bytes('v22_utf16.mp3')],  // tags: Alhaja → doit prendre sa place
+      ['Track99.mp3',                          bytes('Track99.mp3')],
+      ['MUSIC/Abd Alhadi Blkhiat/Alqmr Ala Hmr.mp3', bytes('v24_utf8.mp3')], // déjà rangé
+    ];
+    const r = await page.evaluate(async (tree) => {
+      const root = await navigator.storage.getDirectory();
+      for await (const h of root.values()) await root.removeEntry(h.name, { recursive: true }).catch(() => {});
+      async function put(relPath, arr) {
+        const parts = relPath.split('/'); let dir = root;
+        for (const p of parts.slice(0, -1)) dir = await dir.getDirectoryHandle(p, { create: true });
+        const fh = await dir.getFileHandle(parts[parts.length - 1], { create: true });
+        const w = await fh.createWritable(); await w.write(new Uint8Array(arr)); await w.close();
+      }
+      for (const [p, arr] of tree) await put(p, arr);
+      const okLoad = await loadFromUsb(root);
+      const usbButtons = {
+        go: document.getElementById('organizeGoBtn').style.display,
+        zip: document.getElementById('buildBtn').style.display,
+      };
+      const r1 = await organizeUsb(root, () => {});
+      const r2 = await organizeUsb(root, () => {}); // idempotence
+      async function list(dir, base, out) {
+        for await (const h of dir.values()) {
+          if (h.kind === 'directory') await list(h, base + h.name + '/', out);
+          else out.push(base + h.name + '|' + (await h.getFile()).size);
+        }
+        return out;
+      }
+      return {
+        okLoad, usbButtons,
+        r1: { moved: r1.moved, already: r1.already, failed: r1.failed },
+        r2: { moved: r2.moved, already: r2.already, failed: r2.failed },
+        paths: (await list(root, '', [])).sort(),
+      };
+    }, tree);
+
+    ok(r.okLoad === true, 'scan de la clé réussi');
+    ok(r.usbButtons.go === 'block' && r.usbButtons.zip === 'none', 'mode clé: bouton organiser affiché, bouton ZIP masqué');
+    ok(r.r1.moved === 3 && r.r1.already === 1 && r.r1.failed.length === 0,
+      '1er passage: 3 déplacés, 1 déjà en place, 0 échec → ' + JSON.stringify(r.r1));
+    ok(r.r2.moved === 0 && r.r2.already === 4, '2e passage: rien à refaire (idempotent) → ' + JSON.stringify(r.r2));
+    const files = r.paths.filter(p => p.endsWith('.mp3') || p.includes('.mp3|'));
+    const sz = f => fs.statSync(path.join(FIX, f)).size;
+    const expected = [
+      'MUSIC/Abd Alhadi Blkhiat/Alqmr Ala Hmr.mp3|' + sz('v24_utf8.mp3'),
+      'MUSIC/Alhaja Alhmdaouia/Hzi Kask.mp3|' + sz('v22_utf16.mp3'),
+      'MUSIC/Artiste Inconnu/Track99.mp3|' + sz('Track99.mp3'),
+      'MUSIC/Said Alsnhaji/Chhal Bkit.mp3|' + sz('v23_utf16.mp3'),
+    ];
+    ok(JSON.stringify(files) === JSON.stringify(expected),
+      'clé finale exacte (chaises musicales résolues, aucun écrasement):\n    ' + files.join('\n    '));
+    ok(!r.paths.some(p => p.includes('~')), 'aucun fichier temporaire restant');
+    await ctx.close(); server.close();
+  }
+
   await browser.close();
   console.log(`\ne2e: ${pass} OK, ${fail} ÉCHEC(S)`);
   process.exit(fail ? 1 : 0);

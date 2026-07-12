@@ -82,6 +82,9 @@ footer{text-align:center; font-size:.75rem; color:#8b93a0; margin-top:24px;}
       <small>أو اسحبها وأفلتها هنا · يمكنك الاختيار على دفعات من مجلدات مختلفة، وستُضاف كلها إلى القائمة</small>
       <input type="file" id="fileInput" multiple accept=".mp3,audio/mpeg,audio/*" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
     </label>
+    <button class="main" id="organizeBtn" style="display:none;background:var(--blue)">🗂 أو الأسهل: افتح مفتاح USB ونظّمه مباشرة في مكانه</button>
+    <p class="hint" id="organizeHint" style="display:none;margin-top:6px">أدخل المفتاح، اضغط الزر الأزرق، اختر المفتاح من النافذة واضغط «السماح» — سيُقرأ كل ما فيه من أغاني ثم يُرتَّب ويُعاد تسميته على المفتاح نفسه، بلا تحميل ولا نسخ.</p>
+    <p class="hint" id="noFsaHint" style="display:none;margin-top:6px">ℹ️ متصفح هذا الجهاز لا يسمح بالتنظيم المباشر للمفتاح (قيد من غوغل على الهواتف). استعمل الاختيار أعلاه مع التحميل المقسّم، أو افتح هذه الصفحة على حاسوب لتنظيم المفتاح مباشرة.</p>
     <div class="opts">
       <label><input type="checkbox" id="optNum"> ترقيم الأغاني داخل كل مجلد (01, 02, ...)</label>
       <label><input type="checkbox" id="optSplit" checked> تقسيم التحميل إلى ملفات صغيرة (أنسب للهاتف — يتفادى فشل تنزيل الملفات الضخمة)</label>
@@ -97,6 +100,7 @@ footer{text-align:center; font-size:.75rem; color:#8b93a0; margin-top:24px;}
     </div>
     <div id="warnBox" class="warn" style="display:none"></div>
     <div id="groups" style="margin-top:12px"></div>
+    <button class="main" id="organizeGoBtn" style="display:none">🚀 نظّم المفتاح الآن — نقل وإعادة تسمية مباشرة</button>
     <button class="main" id="directBtn" style="display:none;background:var(--blue)">⚡ نسخ مباشر إلى مفتاح USB أو مجلد — بدون تحميل ولا فك ضغط</button>
     <p class="hint" id="directHint" style="display:none;margin-top:6px">اضغط الزر الأزرق ثم اختر مفتاح USB نفسه (أو أي مجلد) — سيُنشأ مجلد MUSIC منظماً بداخله مباشرة.</p>
     <button class="main" id="buildBtn">⬇ إنشاء الملف المضغوط للنسخ على USB</button>
@@ -239,7 +243,9 @@ function findDuplicates(items){
 }
 
 /* ================= App state ================= */
-let songs = []; // {file, latinArtist, latinTitle}
+let songs = []; // {file, latinArtist, latinTitle} + en mode USB: {handle, parentDir, relPath}
+var appMode = 'zip'; // 'zip' (fichiers choisis) ou 'usb' (clé ouverte directement)
+var usbRoot = null;  // FileSystemDirectoryHandle de la clé en mode 'usb'
 const edits = new Map(); // "nom|taille" → {la, lt} : réutilisé si le fichier est resélectionné
 const $ = id => document.getElementById(id);
 const fmtSize = n => n>1e9 ? (n/1e9).toFixed(2)+' GB' : n>1e6 ? (n/1e6).toFixed(0)+' MB' : Math.max(1,Math.round(n/1e3))+' KB';
@@ -253,22 +259,30 @@ var MAX_ZIP_BYTES = 300*1e6; // au-delà, Chrome/Android échoue souvent à tél
 }));
 $('fileInput').onchange = e => { handleFiles(e.target.files); e.target.value=''; };
 
+// lit les tags d'un fichier et construit l'entrée de la liste (corrections mémorisées reprises)
+async function toSongEntry(f, extra){
+  const t = await readTags(f);
+  let la = sanitize(t.artist) || 'Artiste Inconnu';
+  let lt = sanitize(t.title) || sanitize(f.name.replace(/\.mp3$/i,'')) || ('Piste '+(songs.length+1));
+  const saved = edits.get(editKey(f));
+  if(saved){ la = saved.la || la; lt = saved.lt || lt; }
+  return Object.assign({file:f, latinArtist:la, latinTitle:lt}, extra||{});
+}
+
 async function handleFiles(list){
   const files = [...list];
   const mp3s = files.filter(f=>/\.mp3$/i.test(f.name));
   const skipped = files.length - mp3s.length;
   if(!mp3s.length){ alert('لم أجد ملفات MP3 في اختيارك.\nراديو السيارة القديم يقرأ MP3 فقط — حوّل الأغاني إلى MP3 ثم أعد المحاولة.'); return; }
+  if(appMode==='usb'){ // on quitte le mode clé → nouvelle liste
+    if(songs.length && !confirm('كنتَ في وضع تنظيم المفتاح. سيبدأ اختيار الملفات قائمة جديدة. متابعة؟')) return;
+    songs = []; appMode='zip'; usbRoot=null;
+  }
   const known = new Set(songs.map(s=>editKey(s.file)));
   const fresh = mp3s.filter(f=>!known.has(editKey(f))); // resélection du même fichier = ignorée
   $('lcdMsg').textContent='READING 0/'+fresh.length;
   for(let i=0;i<fresh.length;i++){
-    const f = fresh[i];
-    const t = await readTags(f);
-    let la = sanitize(t.artist) || 'Artiste Inconnu';
-    let lt = sanitize(t.title) || sanitize(f.name.replace(/\.mp3$/i,'')) || ('Piste '+(songs.length+1));
-    const saved = edits.get(editKey(f)); // reprendre les corrections faites avant
-    if(saved){ la = saved.la || la; lt = saved.lt || lt; }
-    songs.push({file:f, latinArtist:la, latinTitle:lt});
+    songs.push(await toSongEntry(fresh[i]));
     $('lcdMsg').textContent='READING '+(i+1)+'/'+fresh.length;
     if(i%10===0) await new Promise(r=>setTimeout(r));
   }
@@ -278,9 +292,143 @@ async function handleFiles(list){
   render();
 }
 
+/* ================= Mode clé USB : scan + organisation sur place ================= */
+async function scanUsb(dir, base, out){
+  for await (const h of dir.values()){
+    if(h.kind==='directory'){
+      if(!h.name.startsWith('.')) await scanUsb(h, base+h.name+'/', out);
+    } else if(/\.mp3$/i.test(h.name)){
+      out.push({handle:h, parentDir:dir, relPath:base+h.name});
+    }
+  }
+  return out;
+}
+
+// charge la liste depuis la clé (appelé par le bouton, et par les tests avec un handle quelconque)
+async function loadFromUsb(root){
+  $('lcdMsg').textContent='SCANNING USB...';
+  const found = await scanUsb(root, '', []);
+  if(!found.length){
+    alert('لم أجد أي ملف MP3 على هذا المفتاح/المجلد.\nتأكد أنك اخترت المفتاح الصحيح.');
+    $('lcdMsg').textContent = songs.length? 'READY ▶':'INSERT MUSIC ♪';
+    return false;
+  }
+  songs = []; appMode='usb'; usbRoot=root;
+  for(let i=0;i<found.length;i++){
+    const f = await found[i].handle.getFile();
+    songs.push(await toSongEntry(f, {handle:found[i].handle, parentDir:found[i].parentDir, relPath:found[i].relPath}));
+    $('lcdMsg').textContent='READING '+(i+1)+'/'+found.length;
+    if(i%10===0) await new Promise(r=>setTimeout(r));
+  }
+  $('warnBox').style.display='none';
+  render();
+  return true;
+}
+
+// déplace/renomme sur la clé elle-même ; move() natif si dispo, sinon copie puis suppression
+async function moveOnUsb(song, targetDir, name){
+  try{ await song.handle.move(targetDir, name); return song.handle; }
+  catch(e){ if(e && e.name==='NotAllowedError') throw e; }
+  const f = await song.handle.getFile();
+  const fh = await targetDir.getFileHandle(name, {create:true});
+  const w = await fh.createWritable();
+  try{ await f.stream().pipeTo(w); }
+  catch(err){
+    try{ await w.abort(); }catch(_){}
+    try{ await targetDir.removeEntry(name); }catch(_){} // ne pas laisser un fichier à moitié écrit
+    throw err;
+  }
+  await song.parentDir.removeEntry(song.handle.name);
+  return fh;
+}
+
+async function organizeUsb(root, onFile){
+  const num = $('optNum').checked;
+  const items = songs.map((s,i)=>({id:i, artist:s.latinArtist, title:s.latinTitle, size:s.file.size,
+    placed: s.relPath && s.relPath.toLowerCase().startsWith(('MUSIC/'+(s.latinArtist||'Artiste Inconnu')+'/').toLowerCase()) ? 0:1}));
+  // sans numérotation : les fichiers déjà dans le bon dossier gardent leur nom en priorité
+  if(!num) items.sort((a,b)=>a.placed-b.placed);
+  const entries = buildPlan(items, num, Infinity).flat();
+  const music = await root.getDirectoryHandle('MUSIC', {create:true});
+  const folders = new Map();
+  const failed = []; let moved = 0, already = 0;
+
+  // phase 1 : un fichier occupe-t-il l'emplacement cible d'un autre ? → le renommer d'abord en nom
+  // temporaire, sinon le déplacement suivant l'écraserait (problème des chaises musicales)
+  const targetOf = e => 'MUSIC/'+e.folder+'/'+e.name;
+  const targetsL = new Set(entries.map(e=>targetOf(e).toLowerCase()));
+  for(const e of entries){
+    const s = songs[e.id]; if(!s.relPath) continue;
+    const relL = s.relPath.toLowerCase(), tgtL = targetOf(e).toLowerCase();
+    if(relL!==tgtL && targetsL.has(relL)){
+      try{
+        const tmp = '~'+e.id+'~'+s.handle.name;
+        s.handle = await moveOnUsb(s, s.parentDir, tmp);
+        s.relPath = s.relPath.replace(/[^/]+$/, tmp);
+      }catch(err){} // la phase 2 signalera l'échec le cas échéant
+    }
+  }
+
+  // phase 2 : déplacer/renommer vers MUSIC/Artiste/Titre.mp3
+  for(const e of entries){
+    const s = songs[e.id];
+    const target = targetOf(e);
+    try{
+      if(s.relPath===target){ already++; onFile(); continue; } // déjà bien rangé
+      let fold = folders.get(e.folder);
+      if(!fold){ fold = await music.getDirectoryHandle(e.folder, {create:true}); folders.set(e.folder, fold); }
+      const newHandle = await moveOnUsb(s, fold, e.name);
+      s.handle = newHandle; s.parentDir = fold; s.relPath = target; // idempotent si on reclique
+      moved++;
+    }catch(err){ failed.push(s.relPath || s.file.name); }
+    onFile(); await sleep(0);
+  }
+  return {moved, already, failed, total:entries.length};
+}
+
+if('showDirectoryPicker' in window){
+  $('organizeBtn').style.display='block';
+  $('organizeHint').style.display='block';
+}else{
+  $('noFsaHint').style.display='block';
+}
+$('organizeBtn').onclick = async ()=>{
+  if(songs.length && appMode!=='usb' && !confirm('لديك ملفات مختارة. فتح المفتاح سيبدأ قائمة جديدة. متابعة؟')) return;
+  let root;
+  try{ root = await showDirectoryPicker({mode:'readwrite'}); }
+  catch(err){
+    if(err && err.name==='AbortError') return;
+    alert('لم يسمح المتصفح بالوصول إلى المفتاح.\nما العمل؟ أعد المحاولة واضغط "السماح/Autoriser" عند السؤال.');
+    return;
+  }
+  await loadFromUsb(root);
+};
+$('organizeGoBtn').onclick = async ()=>{
+  if(!songs.length || !usbRoot) return;
+  $('organizeGoBtn').disabled = true; $('doneBox').style.display='none';
+  $('prog').style.display='block'; $('progBar').style.width='0%';
+  $('lcdMsg').textContent='ORGANIZING ♪';
+  let processed = 0, total = songs.length;
+  try{
+    const r = await organizeUsb(usbRoot, ()=>{ processed++; $('progBar').style.width=(processed/total*100).toFixed(0)+'%'; });
+    $('doneBox').style.display='block'; $('lcdMsg').textContent = r.failed.length && !r.moved && !r.already ? 'ERROR':'DONE ✓';
+    $('doneBox').innerHTML = '✅ <b>مفتاحك منظم!</b><br>'
+      + (r.moved? '• نُقل وأُعيدت تسمية <b>'+r.moved+'</b> أغنية داخل مجلد <b dir="ltr">MUSIC</b>.<br>':'')
+      + (r.already? '• <b>'+r.already+'</b> أغنية كانت منظمة من قبل فتُركت مكانها.<br>':'')
+      + '• أخرج المفتاح وضعه في راديو السيارة — وبالسلامة 🚗🎵<br>'
+      + '<span style="color:#5c6672;font-size:.8rem">ملاحظة: المجلدات القديمة الفارغة بقيت على المفتاح — لا تزعج الراديو، ويمكنك حذفها يدوياً إن أردت.</span>'
+      + (r.failed.length? '<div style="margin-top:8px;color:#8a5a17">⚠️ تعذر نقل <b>'+r.failed.length+'</b> ملفاً:<br><span dir="ltr" style="font-size:.75rem">'+r.failed.slice(0,15).join('<br>')+(r.failed.length>15?'<br>...':'')+'</span></div>' : '');
+  }catch(err){
+    alert('تعذر تنظيم المفتاح ('+err.message+').\nما العمل؟ تأكد أن المفتاح غير محمي من الكتابة، ثم أعد المحاولة.');
+    $('lcdMsg').textContent='ERROR';
+  }
+  $('organizeGoBtn').disabled = false;
+  $('prog').style.display='none'; $('progBar').style.width='0%';
+};
+
 $('clearBtn').onclick = ()=>{
   if(songs.length && !confirm('سيتم إفراغ القائمة كلها (ملفاتك على الجهاز لا تُمسّ). متابعة؟')) return;
-  songs = []; render();
+  songs = []; appMode='zip'; usbRoot=null; render();
 };
 $('dedupBtn').onclick = ()=>{
   const drop = new Set(findDuplicates(songs.map((s,i)=>({id:i, artist:s.latinArtist, title:s.latinTitle, size:s.file.size}))));
@@ -301,6 +449,12 @@ function render(){
   $('lcdS').textContent = songs.length? fmtSize(songs.reduce((a,s)=>a+s.file.size,0)) : '--';
   $('lcdMsg').textContent = songs.length? 'READY ▶':'INSERT MUSIC ♪';
   $('reviewStep').style.display = songs.length? 'block':'none';
+  // boutons d'action selon le mode : clé USB ouverte → organiser sur place ; sinon → copie directe / ZIP
+  const usb = appMode==='usb', fsa = ('showDirectoryPicker' in window);
+  $('organizeGoBtn').style.display = usb? 'block':'none';
+  $('buildBtn').style.display = usb? 'none':'block';
+  $('directBtn').style.display = (!usb && fsa)? 'block':'none';
+  $('directHint').style.display = (!usb && fsa)? 'block':'none';
   const dups = new Set(findDuplicates(songs.map((s,i)=>({id:i, artist:s.latinArtist, title:s.latinTitle, size:s.file.size}))));
   $('dedupBtn').style.display = dups.size? 'inline-block':'none';
   if(dups.size) $('dedupBtn').textContent = '✨ حذف المكررات تلقائياً ('+dups.size+')';
@@ -397,10 +551,6 @@ async function writeDirect(rootDir, entries, onFile){
   return {added, failed};
 }
 
-if('showDirectoryPicker' in window){
-  $('directBtn').style.display='block';
-  $('directHint').style.display='block';
-}
 $('directBtn').onclick = async ()=>{
   if(!songs.length) return;
   let root;
