@@ -81,6 +81,7 @@ footer{text-align:center; font-size:.75rem; color:#8b93a0; margin-top:24px;}
     </label>
     <div class="opts">
       <label><input type="checkbox" id="optNum"> ترقيم الأغاني داخل كل مجلد (01, 02, ...)</label>
+      <label><input type="checkbox" id="optSplit" checked> ملف مضغوط منفصل لكل فنان (أنسب للهاتف — ملفات صغيرة)</label>
     </div>
   </div>
 
@@ -247,53 +248,76 @@ function render(){
 /* ================= Build ZIP ================= */
 $('buildBtn').onclick = async ()=>{
   if(!songs.length) return;
+  const split = $('optSplit').checked;
   const totalGB = songs.reduce((a,s)=>a+s.file.size,0)/1e9;
-  if(totalGB>2 && !confirm('الحجم يفوق 2GB — قد يستغرق وقتاً أو يثقل المتصفح. يُنصح بالعمل على دفعات. المتابعة؟')) return;
+  if(!split && totalGB>1 && !confirm('الحجم كبير وقد يفشل التنزيل على الهاتف. يُنصح بتفعيل خيار "ملف لكل فنان". المتابعة بملف واحد؟')) return;
   $('buildBtn').disabled = true; $('doneBox').style.display='none';
   $('prog').style.display='block'; $('lcdMsg').textContent='BURNING... ♪';
-  const zip = new JSZip();
-  const root = zip.folder('MUSIC');
   const g = groupsMap(); const num = $('optNum').checked;
-  const used = new Set(); const failed = [];
-  let done = 0, total = songs.length, added = 0;
-  for(const [artist, idxs] of g){
-    const folder = root.folder(artist);
+  const failed = []; let addedTotal = 0;
+
+  const saveBlob = (blob, name)=>{
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  async function packGroup(zipRoot, artist, idxs){
+    const folder = zipRoot.folder(artist);
+    const used = new Set(); let added = 0;
     for(let k=0; k<idxs.length; k++){
       const i = idxs[k];
       let name = (num? String(k+1).padStart(2,'0')+' - ':'') + songs[i].latinTitle;
-      let full = artist+'/'+name, n=2;
-      while(used.has(full)){ full = artist+'/'+name+' ('+n+')'; n++; }
-      used.add(full);
+      let n = 2; while(used.has(name)){ name = songs[i].latinTitle+' ('+n+')'; n++; }
+      used.add(name);
       try{
-        const buf = await songs[i].file.arrayBuffer(); // read now; fails only for THIS file
-        folder.file(full.split('/')[1]+'.mp3', buf);
-        added++;
+        const buf = await songs[i].file.arrayBuffer();
+        folder.file(name+'.mp3', buf); added++;
       }catch(e){ failed.push(songs[i].file.name); }
-      done++;
-      $('progBar').style.width = (done/total*50).toFixed(0)+'%';
-      if(done%5===0) await new Promise(r=>setTimeout(r));
+      await new Promise(r=>setTimeout(r));
     }
+    return added;
   }
-  if(!added){
-    alert('تعذرت قراءة كل الملفات. السبب الأرجح: الأغاني في Google Drive أو السحابة وليست محمّلة على الهاتف.\nنزّلها أولاً إلى الهاتف ثم اخترها من تطبيق "ملفاتي".');
-    $('buildBtn').disabled=false; $('prog').style.display='none'; $('lcdMsg').textContent='ERROR'; return;
-  }
+
   try{
-    const blob = await zip.generateAsync(
-      {type:'blob', compression:'STORE'},
-      meta => { $('progBar').style.width = (50+meta.percent/2).toFixed(0)+'%'; }
-    );
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'MUSIC_USB.zip';
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
-    $('doneBox').style.display='block'; $('lcdMsg').textContent='DONE ✓';
-    if(failed.length){
-      $('doneBox').innerHTML += '<div style="margin-top:8px;color:#8a5a17">⚠️ تم تخطي <b>'+failed.length+'</b> ملفاً تعذرت قراءته (غالباً مخزّن في السحابة وليس على الهاتف):<br><span dir="ltr" style="font-size:.75rem">'+failed.slice(0,15).join('<br>')+(failed.length>15?'<br>...':'')+'</span><br>نزّله إلى الهاتف ثم أعد المحاولة به وحده.</div>';
+    if(split){
+      const arts = [...g.entries()]; let gi = 0;
+      for(const [artist, idxs] of arts){
+        const zip = new JSZip();
+        const added = await packGroup(zip.folder('MUSIC'), artist, idxs);
+        if(added){
+          const blob = await zip.generateAsync({type:'blob', compression:'STORE'});
+          saveBlob(blob, 'MUSIC_'+artist.replace(/\s+/g,'_')+'.zip');
+          addedTotal += added;
+          await new Promise(r=>setTimeout(r, 1800)); // laisser le téléchargement démarrer
+        }
+        gi++; $('progBar').style.width = (gi/arts.length*100).toFixed(0)+'%';
+      }
+    } else {
+      const zip = new JSZip(); const root = zip.folder('MUSIC');
+      let gi = 0;
+      for(const [artist, idxs] of g){
+        addedTotal += await packGroup(root, artist, idxs);
+        gi++; $('progBar').style.width = (gi/g.size*50).toFixed(0)+'%';
+      }
+      if(addedTotal){
+        const blob = await zip.generateAsync(
+          {type:'blob', compression:'STORE'},
+          meta => { $('progBar').style.width = (50+meta.percent/2).toFixed(0)+'%'; }
+        );
+        saveBlob(blob, 'MUSIC_USB.zip');
+      }
+    }
+    if(!addedTotal){
+      alert('تعذرت قراءة كل الملفات. السبب الأرجح: الأغاني في السحابة وليست محمّلة على الهاتف.\nنزّلها أولاً ثم اخترها من تطبيق "ملفاتي".');
+      $('lcdMsg').textContent='ERROR';
+    } else {
+      $('doneBox').style.display='block'; $('lcdMsg').textContent='DONE ✓';
+      $('doneBox').innerHTML = '✅ <b>تم! ('+addedTotal+' أغنية)</b> الخطوات المتبقية:<br>١) فك ضغط '+(split?'كل الملفات في نفس المكان — ستتجمع داخل مجلد <b dir="ltr">MUSIC</b>':'الملف — ستجد مجلد <b dir="ltr">MUSIC</b>')+'<br>٢) هيّئ مفتاح USB بنظام <b dir="ltr">FAT32</b> (32GB أو أقل)<br>٣) انسخ مجلد MUSIC كاملاً إلى المفتاح — وبالسلامة 🚗🎵'
+        + (failed.length? '<div style="margin-top:8px;color:#8a5a17">⚠️ تم تخطي <b>'+failed.length+'</b> ملفاً تعذرت قراءته (غالباً في السحابة):<br><span dir="ltr" style="font-size:.75rem">'+failed.slice(0,15).join('<br>')+(failed.length>15?'<br>...':'')+'</span></div>' : '');
     }
   }catch(err){
-    alert('تعذر إنشاء الملف: '+err.message+'\nجرّب عدداً أقل من الأغاني في كل دفعة.');
+    alert('تعذر إنشاء الملف: '+err.message+'\nفعّل خيار "ملف لكل فنان" أو اعمل على دفعات أصغر.');
     $('lcdMsg').textContent='ERROR';
   }
   $('buildBtn').disabled=false; $('prog').style.display='none'; $('progBar').style.width='0%';
