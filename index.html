@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>منظم أغاني السيارة — USB</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --orange:#E8720C; --blue:#1A6FA8; --ink:#1c2733; --paper:#f5f2ec;
+  --lcd-bg:#0d1b12; --lcd:#7dff9e; --line:#d8d2c6;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{font-family:'Cairo',sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; padding-bottom:80px;}
+.wrap{max-width:860px; margin:0 auto; padding:16px;}
+
+/* ---- Radio head-unit header (signature) ---- */
+.radio{background:linear-gradient(180deg,#2a3542,#1c2733); border-radius:14px; padding:14px 16px; margin:14px 0 20px; box-shadow:0 6px 18px rgba(28,39,51,.35); border:1px solid #3b4b5c;}
+.radio h1{color:#fff; font-size:1.15rem; font-weight:900; display:flex; align-items:center; gap:10px;}
+.radio h1 .knob{width:18px;height:18px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#9fb3c6,#4a5a6b);border:2px solid #0f1720; flex:none;}
+.lcd{background:var(--lcd-bg); border-radius:8px; margin-top:10px; padding:10px 14px; font-family:'Courier New',monospace; color:var(--lcd); font-weight:700; letter-spacing:1px; font-size:.95rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; border:1px solid #052b14; text-shadow:0 0 6px rgba(125,255,158,.5); direction:ltr;}
+.lcd span b{color:#c8ffd6;}
+
+/* ---- Steps ---- */
+.step{background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px;}
+.step h2{font-size:1rem; font-weight:800; color:var(--blue); margin-bottom:8px;}
+.hint{font-size:.85rem; color:#5c6672; line-height:1.7;}
+
+.drop{border:2px dashed var(--blue); border-radius:12px; padding:26px 14px; text-align:center; cursor:pointer; transition:.15s; background:#f2f7fb;}
+.drop.on{background:#e3f0f9; border-color:var(--orange);}
+.drop p{font-weight:700; color:var(--blue);}
+.drop small{color:#5c6672;}
+
+button.main{background:var(--orange); color:#fff; border:0; font-family:inherit; font-weight:800; font-size:1rem; padding:12px 22px; border-radius:10px; cursor:pointer; width:100%; margin-top:10px;}
+button.main:disabled{background:#c9c2b6; cursor:not-allowed;}
+button.ghost{background:#fff; color:var(--blue); border:1.5px solid var(--blue); font-family:inherit; font-weight:700; padding:6px 14px; border-radius:8px; cursor:pointer; font-size:.85rem;}
+
+.opts{display:flex; flex-direction:column; gap:8px; margin-top:8px; font-size:.9rem;}
+.opts label{display:flex; align-items:center; gap:8px; cursor:pointer;}
+.opts input{width:18px;height:18px; accent-color:var(--orange);}
+
+/* ---- Groups ---- */
+.group{border:1px solid var(--line); border-radius:10px; margin-bottom:12px; overflow:hidden;}
+.group header{background:#eef4f9; padding:8px 12px; display:flex; align-items:center; gap:8px;}
+.group header .tag{background:var(--blue); color:#fff; font-size:.7rem; font-weight:800; border-radius:6px; padding:2px 8px; flex:none;}
+.group header input{flex:1; border:1px solid #c7d6e2; border-radius:6px; padding:4px 8px; font-family:'Courier New',monospace; font-weight:700; font-size:.9rem; direction:ltr; text-align:left; min-width:0;}
+.song{display:flex; align-items:center; gap:8px; padding:6px 12px; border-top:1px solid #f0ece3; font-size:.85rem;}
+.song input{flex:1; border:1px solid #e0dacd; border-radius:6px; padding:3px 8px; font-family:'Courier New',monospace; font-size:.82rem; direction:ltr; text-align:left; min-width:0;}
+.song .orig{color:#8b93a0; font-size:.72rem; max-width:34%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; direction:ltr;}
+.song .del{border:0;background:none;color:#c0392b;cursor:pointer;font-size:1rem;flex:none;}
+
+.warn{background:#fdf3e7; border:1px solid #f0cfa3; border-radius:10px; padding:10px 14px; font-size:.85rem; color:#8a5a17; margin-bottom:12px; line-height:1.8;}
+.progress{height:14px; background:#e8e2d5; border-radius:7px; overflow:hidden; margin-top:12px; display:none;}
+.progress i{display:block; height:100%; width:0%; background:linear-gradient(90deg,var(--blue),var(--orange)); transition:width .2s;}
+.done{display:none; background:#eaf7ee; border:1px solid #b8e0c4; border-radius:10px; padding:14px; margin-top:12px; font-size:.9rem; line-height:1.9;}
+
+footer{text-align:center; font-size:.75rem; color:#8b93a0; margin-top:24px;}
+@media(max-width:520px){ .song .orig{display:none;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="radio">
+    <h1><span class="knob"></span> منظم أغاني السيارة <span style="font-size:.75rem;font-weight:600;color:#9fb3c6">— جاهز لمفتاح USB</span></h1>
+    <div class="lcd" id="lcd">
+      <span>FILES <b id="lcdF">--</b></span>
+      <span>ARTISTS <b id="lcdA">--</b></span>
+      <span>SIZE <b id="lcdS">--</b></span>
+      <span id="lcdMsg">INSERT MUSIC ♪</span>
+    </div>
+  </div>
+
+  <div class="step">
+    <h2>١ · اختر الأغاني</h2>
+    <label class="drop" id="drop" for="fileInput" style="display:block;position:relative">
+      <p>اضغط هنا لاختيار ملفات MP3</p>
+      <small>أو اسحبها وأفلتها هنا (يمكن اختيار مئات الملفات دفعة واحدة)</small>
+      <input type="file" id="fileInput" multiple accept=".mp3,audio/mpeg,audio/*" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">
+    </label>
+    <div class="opts">
+      <label><input type="checkbox" id="optNum"> ترقيم الأغاني داخل كل مجلد (01, 02, ...)</label>
+    </div>
+  </div>
+
+  <div class="step" id="reviewStep" style="display:none">
+    <h2>٢ · راجع المجلدات</h2>
+    <p class="hint">حُوِّلت الأسماء إلى حروف لاتينية ليقرأها راديو السيارة. يمكنك تعديل اسم أي مجلد أو ملف. لدمج فنانَين، أعطِ المجلدين نفس الاسم.</p>
+    <div id="warnBox" class="warn" style="display:none"></div>
+    <div id="groups" style="margin-top:12px"></div>
+    <button class="main" id="buildBtn">⬇ إنشاء الملف المضغوط للنسخ على USB</button>
+    <div class="progress" id="prog"><i id="progBar"></i></div>
+    <div class="done" id="doneBox">
+      ✅ <b>تم التحميل!</b> الخطوات المتبقية:<br>
+      ١) فك ضغط الملف — ستجد مجلد <b dir="ltr">MUSIC</b><br>
+      ٢) هيّئ مفتاح USB بنظام <b dir="ltr">FAT32</b> (32GB أو أقل)<br>
+      ٣) انسخ مجلد MUSIC كاملاً إلى المفتاح — وبالسلامة 🚗🎵
+    </div>
+  </div>
+
+  <footer>ذ. أحمد بوعمود — أداة شخصية · تعمل محلياً، لا يُرفع أي ملف للإنترنت</footer>
+</div>
+
+<script>
+'use strict';
+/* ================= Transliteration ================= */
+const AR = {'ا':'a','أ':'a','إ':'i','آ':'a','ب':'b','ت':'t','ث':'th','ج':'j','ح':'h','خ':'kh','د':'d','ذ':'dh','ر':'r','ز':'z','س':'s','ش':'ch','ص':'s','ض':'d','ط':'t','ظ':'dh','ع':'a','غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m','ن':'n','ه':'h','و':'ou','ي':'i','ى':'a','ة':'a','ء':'','ئ':'i','ؤ':'ou','ٱ':'a','پ':'p','ڤ':'v','گ':'g','چ':'tch','٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9'};
+function toLatin(s){
+  if(!s) return '';
+  s = s.normalize('NFKD').replace(/[\u064B-\u0652\u0670]/g,''); // strip harakat
+  let out='';
+  for(const ch of s){ out += (AR[ch]!==undefined)?AR[ch]:ch; }
+  out = out.normalize('NFD').replace(/[\u0300-\u036f]/g,'');   // strip accents (é→e)
+  out = out.replace(/[^A-Za-z0-9 _\-()&']/g,' ').replace(/\s+/g,' ').trim();
+  out = out.replace(/\b\w/g,c=>c.toUpperCase());
+  return out;
+}
+const sanitize = s => (toLatin(s)||'').slice(0,60).trim();
+
+/* ================= ID3 tag reading ================= */
+const dec = (label,buf)=>{ try{return new TextDecoder(label).decode(buf).replace(/\0+$/,'').replace(/^\uFEFF/,'').trim();}catch(e){return '';} };
+function readText(bytes){
+  if(!bytes.length) return '';
+  const enc = bytes[0], b = bytes.subarray(1);
+  if(enc===0) return dec('windows-1256', b) || dec('windows-1252', b);
+  if(enc===1) return (b[0]===0xFE && b[1]===0xFF) ? dec('utf-16be', b.subarray(2)) : dec('utf-16le', (b[0]===0xFF&&b[1]===0xFE)?b.subarray(2):b);
+  if(enc===2) return dec('utf-16be', b);
+  return dec('utf-8', b);
+}
+async function readTags(file){
+  const out = {artist:'', title:''};
+  try{
+    const head = new Uint8Array(await file.slice(0, 262144).arrayBuffer());
+    if(head[0]===0x49 && head[1]===0x44 && head[2]===0x33){ // "ID3"
+      const ver = head[3];
+      const ss = (a,b,c,d)=>((a&0x7f)<<21)|((b&0x7f)<<14)|((c&0x7f)<<7)|(d&0x7f);
+      const tagSize = ss(head[6],head[7],head[8],head[9]);
+      let pos = 10;
+      if(head[5] & 0x40){ // extended header
+        const ext = (ver===4)? ss(head[10],head[11],head[12],head[13]) : ((head[10]<<24)|(head[11]<<16)|(head[12]<<8)|head[13])+4;
+        pos += ext;
+      }
+      const end = Math.min(10+tagSize, head.length);
+      const idLen = (ver===2)?3:4, szLen=(ver===2)?3:4, flLen=(ver===2)?0:2;
+      const wantA = (ver===2)?'TP1':'TPE1', wantT = (ver===2)?'TT2':'TIT2';
+      while(pos + idLen + szLen <= end){
+        const id = String.fromCharCode(...head.subarray(pos, pos+idLen));
+        if(!/^[A-Z0-9]+$/.test(id)) break;
+        let size;
+        if(ver===2) size = (head[pos+3]<<16)|(head[pos+4]<<8)|head[pos+5];
+        else if(ver===4) size = ss(head[pos+4],head[pos+5],head[pos+6],head[pos+7]);
+        else size = (head[pos+4]<<24)|(head[pos+5]<<16)|(head[pos+6]<<8)|head[pos+7];
+        const dataStart = pos + idLen + szLen + flLen;
+        if(size<=0 || dataStart+size>head.length) break;
+        if(id===wantA) out.artist = readText(head.subarray(dataStart, dataStart+size));
+        if(id===wantT) out.title  = readText(head.subarray(dataStart, dataStart+size));
+        if(out.artist && out.title) break;
+        pos = dataStart + size;
+      }
+    }
+    if(!out.artist || !out.title){ // ID3v1 fallback (often windows-1256 in Morocco)
+      const tail = new Uint8Array(await file.slice(Math.max(0,file.size-128)).arrayBuffer());
+      if(tail.length===128 && String.fromCharCode(tail[0],tail[1],tail[2])==='TAG'){
+        if(!out.title)  out.title  = dec('windows-1256', tail.subarray(3,33));
+        if(!out.artist) out.artist = dec('windows-1256', tail.subarray(33,63));
+      }
+    }
+  }catch(e){}
+  if(!out.artist || !out.title){ // filename fallback: "Artist - Title.mp3"
+    const base = file.name.replace(/\.[^.]+$/,'');
+    const m = base.match(/^(.+?)\s*[-–—]\s*(.+)$/);
+    if(m){ out.artist = out.artist||m[1]; out.title = out.title||m[2]; }
+    else if(!out.title) out.title = base;
+  }
+  return out;
+}
+
+/* ================= App state ================= */
+let songs = []; // {file, artist, title, latinArtist, latinTitle, keep}
+const $ = id => document.getElementById(id);
+const fmtSize = n => n>1e9 ? (n/1e9).toFixed(2)+' GB' : (n/1e6).toFixed(0)+' MB';
+
+['dragover','dragleave','drop'].forEach(ev=> $('drop').addEventListener(ev, e=>{
+  e.preventDefault();
+  $('drop').classList.toggle('on', ev==='dragover');
+  if(ev==='drop') handleFiles(e.dataTransfer.files);
+}));
+$('fileInput').onchange = e => handleFiles(e.target.files);
+
+async function handleFiles(list){
+  const files = [...list];
+  const mp3s = files.filter(f=>/\.mp3$/i.test(f.name));
+  const skipped = files.length - mp3s.length;
+  if(!mp3s.length){ alert('لم أجد ملفات MP3. راديو السيارة القديم يقرأ MP3 فقط.'); return; }
+  $('lcdMsg').textContent='READING TAGS...';
+  songs = [];
+  for(let i=0;i<mp3s.length;i++){
+    const f = mp3s[i];
+    const t = await readTags(f);
+    const la = sanitize(t.artist) || 'Artiste Inconnu';
+    const lt = sanitize(t.title) || sanitize(f.name.replace(/\.mp3$/i,'')) || ('Piste '+(i+1));
+    songs.push({file:f, latinArtist:la, latinTitle:lt});
+    if(i%20===0){ $('lcdF').textContent = i+'/'+mp3s.length; await new Promise(r=>setTimeout(r)); }
+  }
+  const wb = $('warnBox');
+  if(skipped>0){ wb.style.display='block'; wb.innerHTML = '⚠️ تم استبعاد <b>'+skipped+'</b> ملفاً بصيغة غير MP3 (الراديو القديم لا يقرأها). حوّلها إلى MP3 ثم أضفها.'; }
+  else wb.style.display='none';
+  render();
+}
+
+function groupsMap(){
+  const g = new Map();
+  songs.forEach((s,i)=>{ const k=s.latinArtist||'Artiste Inconnu'; if(!g.has(k)) g.set(k,[]); g.get(k).push(i); });
+  return new Map([...g.entries()].sort((a,b)=>a[0].localeCompare(b[0])));
+}
+
+function render(){
+  const g = groupsMap();
+  $('lcdF').textContent = songs.length;
+  $('lcdA').textContent = g.size;
+  $('lcdS').textContent = fmtSize(songs.reduce((a,s)=>a+s.file.size,0));
+  $('lcdMsg').textContent = songs.length? 'READY ▶':'INSERT MUSIC ♪';
+  $('reviewStep').style.display = songs.length? 'block':'none';
+  const box = $('groups'); box.innerHTML='';
+  for(const [artist, idxs] of g){
+    const div = document.createElement('div'); div.className='group';
+    const h = document.createElement('header');
+    h.innerHTML = '<span class="tag">📁 '+idxs.length+'</span>';
+    const inp = document.createElement('input'); inp.value = artist;
+    inp.onchange = ()=>{ const v=sanitize(inp.value)||'Artiste Inconnu'; idxs.forEach(i=>songs[i].latinArtist=v); render(); };
+    h.appendChild(inp); div.appendChild(h);
+    idxs.forEach(i=>{
+      const row = document.createElement('div'); row.className='song';
+      const ti = document.createElement('input'); ti.value = songs[i].latinTitle;
+      ti.onchange = ()=>{ songs[i].latinTitle = sanitize(ti.value)||songs[i].latinTitle; ti.value=songs[i].latinTitle; };
+      const orig = document.createElement('span'); orig.className='orig'; orig.textContent = songs[i].file.name;
+      const del = document.createElement('button'); del.className='del'; del.textContent='✕'; del.title='إزالة';
+      del.onclick = ()=>{ songs.splice(i,1); render(); };
+      row.append(ti, orig, del); div.appendChild(row);
+    });
+    box.appendChild(div);
+  }
+}
+
+/* ================= Build ZIP ================= */
+$('buildBtn').onclick = async ()=>{
+  if(!songs.length) return;
+  const totalGB = songs.reduce((a,s)=>a+s.file.size,0)/1e9;
+  if(totalGB>2 && !confirm('الحجم يفوق 2GB — قد يستغرق وقتاً أو يثقل المتصفح. يُنصح بالعمل على دفعات. المتابعة؟')) return;
+  $('buildBtn').disabled = true; $('doneBox').style.display='none';
+  $('prog').style.display='block'; $('lcdMsg').textContent='BURNING... ♪';
+  const zip = new JSZip();
+  const root = zip.folder('MUSIC');
+  const g = groupsMap(); const num = $('optNum').checked;
+  const used = new Set();
+  for(const [artist, idxs] of g){
+    const folder = root.folder(artist);
+    idxs.forEach((i,k)=>{
+      let name = (num? String(k+1).padStart(2,'0')+' - ':'') + songs[i].latinTitle;
+      let full = artist+'/'+name, n=2;
+      while(used.has(full)){ full = artist+'/'+name+' ('+n+')'; n++; }
+      used.add(full);
+      folder.file(full.split('/')[1]+'.mp3', songs[i].file);
+    });
+  }
+  try{
+    const blob = await zip.generateAsync(
+      {type:'blob', compression:'STORE'},
+      meta => { $('progBar').style.width = meta.percent.toFixed(0)+'%'; }
+    );
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'MUSIC_USB.zip';
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 60000);
+    $('doneBox').style.display='block'; $('lcdMsg').textContent='DONE ✓';
+  }catch(err){
+    alert('تعذر إنشاء الملف: '+err.message+'\nجرّب عدداً أقل من الأغاني في كل دفعة.');
+    $('lcdMsg').textContent='ERROR';
+  }
+  $('buildBtn').disabled=false; $('prog').style.display='none'; $('progBar').style.width='0%';
+};
+</script>
+</body>
+</html>
